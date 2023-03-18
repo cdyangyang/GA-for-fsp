@@ -9,13 +9,16 @@ import datetime
 import numpy as np
 import re
 
-jobs = 8  # 卡匣数 - 待生产的主原料，内部装有晶圆
-machines = 10  # 机器数
+jobs = 20  # 卡匣数 - 待生产的主原料，内部装有晶圆
+machines = 5  # 机器数
 population_num = 10  # 种群规模
 population = []  # 初始种群
 variation_rate = 0.8  # 变异率
-iters = 100  # 进化次数
-target_points = [1, 2, 3]  # 变异靶点
+iters = 50  # 进化次数
+target_points = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]  # 变异靶点
+
+# 产生随机解
+random.seed(10)
 
 # 初始化一个种群
 for i in range(population_num):
@@ -28,9 +31,9 @@ time_table = [[31, 41, 25, 30],
               [13, 22, 14, 13],
               [33, 5, 57, 19]]'''
 time_table = np.random.randint(1, 100, (jobs, machines))  # 加工时间表，10*5
-# 产生随机解
-random.seed(0)
 
+print('time table is:')
+print(time_table)
 
 # 定义工作节点类 name为Cij:第i个卡匣在第j个机器上加工，StartTime为开始时间，LoadTime为加工时间，EndTime为加工结束时间
 class Cij:
@@ -84,6 +87,21 @@ def c_max(n):
                 load_time_tables.append([locals()['c{}_{}'.format(job, machine)].name, [
                     locals()['c{}_{}'.format(job, machine)].StartTime,
                     locals()['c{}_{}'.format(job, machine)].EndTime]])
+
+            try:
+                if job == 121 and machine == 1 and locals()['c{}_{}'.format(job, machine)].StartTime < 100:
+                    load_time_tables.remove([locals()['c{}_{}'.format(job, machine)].name, [
+                        locals()['c{}_{}'.format(job, machine)].StartTime,
+                        locals()['c{}_{}'.format(job, machine)].EndTime]])
+                    locals()['c{}_{}'.format(job, machine)].StartTime = 0
+                    locals()['c{}_{}'.format(job, machine)].EndTime = locals()[
+                                                                          'c{}_{}'.format(job, machine)].StartTime + \
+                                                                      locals()['c{}_{}'.format(job, machine)].LoadTime
+                    load_time_tables.append([locals()['c{}_{}'.format(job, machine)].name, [
+                        locals()['c{}_{}'.format(job, machine)].StartTime,
+                        locals()['c{}_{}'.format(job, machine)].EndTime]])
+            except Exception as e:
+                pass
     return load_time_tables, load_time_tables[-1][-1][-1]
 
 
@@ -194,7 +212,9 @@ for i in population:
     solution_list.append(locals()['solution{}'.format(population.index(i))])
 # 循环开始
 start = datetime.datetime.now()
+outtimetable = []
 for i in range(iters):
+    outtimetable.append(solution_list[0].makespan)
     if i % 10 == 0:
         print('第{}次进化后的最优加工时间为{}'.format(i, solution_list[0].makespan))
     pops = [i.state for i in solution_list]
@@ -222,6 +242,8 @@ for i in range(iters):
     solution_list.sort(key=lambda x: x.makespan)
     del solution_list[population_num:]
 print('进化完成，最终最优加工时间为：', solution_list[0].makespan)
+print('加工时间汇总：')
+print(outtimetable)
 end = datetime.datetime.now()
 print('耗时{}'.format(end - start))
 
@@ -236,18 +258,30 @@ def color():  # 甘特图颜色生成函数
 
 
 colors = [color() for i in range(jobs)]  # 甘特图颜色列表
+plt.figure(dpi=300,figsize=(18,16))
+print('最终解决方案：')
+ltemp = solution_list[0].load_table
+
+countn = 1
 for i in solution_list[0].load_table:
     print(i)
     y = eval(re.findall('_(\d+)', i[0])[0])  # 正则表达式匹配数
     label = re.findall(r'(\d*?)_', i[0])[0]  # 正则表达式匹配机器数
     plt.barh(y=y, left=i[1][0], width=i[1][-1] - i[1][0], height=0.5, color=colors[eval(label) - 1],
              label=f'job{label}')
+    if i[1][-1] - i[1][0] > 0:
+        plt.text(i[1][0], y, i[0])
+    countn += 1
+
 plt.rcParams['font.sans-serif'] = ['SimHei']  # 显示中文标签
 plt.rcParams['font.serif'] = ['KaiTi']
 plt.rcParams['axes.unicode_minus'] = False
-plt.title('jsp最优调度甘特图')
+plt.title('FSP 最优调度甘特图')
 plt.xlabel('加工时间')
 plt.ylabel('加工机器')
+plt.rcParams.update({'font.size':5}) # 图例字体
+plt.legend(loc='lower left') # 图标所处位置
+
 handles, labels = plt.gca().get_legend_handles_labels()  # 标签去重
 by_label = OrderedDict(zip(labels, handles))
 plt.legend(by_label.values(), by_label.keys())
